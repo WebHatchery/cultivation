@@ -1,10 +1,12 @@
 mod building_details;
 mod building_missions;
 mod crafting;
+mod herb_management;
 mod map_view;
 mod panels;
 mod spirit_beasts;
 mod tutorial;
+mod workshop;
 
 use crate::data::buildings::{BuildingStatus, BuildingType};
 use crate::data::disciples::Disciple;
@@ -17,7 +19,7 @@ use crate::data::spirit_beasts::SpiritBeast;
 use crate::engine::actions::Action;
 use crate::state::{StateTransition, TutorialState, UpdateResult};
 use crate::ui::components::*;
-use crate::ui::herbs;
+use crate::ui::herb_widgets as herbs;
 use crate::ui::tech::{self, TechTreeState};
 use crate::ui::theme::*;
 use crate::ui::TextureManager;
@@ -55,11 +57,17 @@ pub struct SectBaseState {
     pub(super) building_mask_cache: HashMap<String, Image>,
     pub(super) selected_beast_index: Option<usize>,
     pub(super) beast_equip_modal_open: bool,
+    pub(super) beast_page: usize,
+    pub(super) beast_detail_page: usize,
+    pub(super) beast_item_page: usize,
     pub(super) mission_tab: usize,
     pub(super) mission_page: usize,
     pub(super) herb_planting_modal: Option<usize>,
-    pub(super) disciple_assignment_modal: bool,
-    pub(super) infusion_modal_open: bool,
+    pub(super) facility_id: Option<u64>,
+    pub(super) facility_tab: usize,
+    pub(super) facility_page: usize,
+    pub(super) facility_detail_page: usize,
+    pub(super) facility_selected: usize,
     pub(super) tutorial_step_active: Option<usize>,
     pub(super) tutorial_targets: Vec<Rect>,
 }
@@ -85,11 +93,17 @@ impl SectBaseState {
             building_mask_cache: HashMap::new(),
             selected_beast_index: None,
             beast_equip_modal_open: false,
+            beast_page: 0,
+            beast_detail_page: 0,
+            beast_item_page: 0,
             mission_tab: 0,
             mission_page: 0,
             herb_planting_modal: None,
-            disciple_assignment_modal: false,
-            infusion_modal_open: false,
+            facility_id: None,
+            facility_tab: 0,
+            facility_page: 0,
+            facility_detail_page: 0,
+            facility_selected: 0,
             tutorial_step_active: None,
             tutorial_targets: Vec::new(),
         }
@@ -142,6 +156,16 @@ impl SectBaseState {
             None
         };
 
+        if let SectView::BuildingDetails(id) = self.view {
+            if self.facility_id != Some(id) {
+                self.facility_id = Some(id);
+                self.facility_tab = 0;
+                self.facility_page = 0;
+                self.facility_detail_page = 0;
+                self.facility_selected = 0;
+                self.herb_planting_modal = None;
+            }
+        }
         // Focused screens own input for the entire frame, including the close frame.
         if self.settings_open {
             return self
@@ -216,6 +240,37 @@ impl SectBaseState {
                     .unwrap_or_else(UpdateResult::new);
             }
         }
+        if let SectView::BuildingDetails(id) = self.view {
+            if let Some(building) = data
+                .buildings
+                .iter()
+                .find(|building| building.id == id && building.status == BuildingStatus::Active)
+            {
+                if matches!(
+                    building.building_type,
+                    BuildingType::HerbGarden
+                        | BuildingType::Greenhouse
+                        | BuildingType::DryingPavilion
+                        | BuildingType::HerbStorage
+                ) {
+                    return self
+                        .draw_facility(
+                            building,
+                            data,
+                            inventory,
+                            disciples,
+                            current_season,
+                            spirit_stones,
+                        )
+                        .unwrap_or_else(UpdateResult::new);
+                }
+            }
+        }
+        if self.view == SectView::SpiritBeasts {
+            return self
+                .draw_guardians(data, spirit_beasts, inventory)
+                .unwrap_or_else(UpdateResult::new);
+        }
         let guidance_h = if tutorial.active && !tutorial.hidden {
             112.0
         } else {
@@ -289,6 +344,24 @@ impl SectBaseState {
         self.crafting_modal_open = scene == "construction";
     }
 
+    pub fn prepare_facility_capture(&mut self, scene: &str, id: u64) {
+        self.view = if scene == "guardians" {
+            SectView::SpiritBeasts
+        } else {
+            SectView::BuildingDetails(id)
+        };
+        self.facility_id = Some(id);
+        self.crafting_modal_open = scene == "workshop";
+        self.herb_planting_modal = if scene == "seeds" { Some(0) } else { None };
+        self.facility_tab = if scene == "attendants" {
+            1
+        } else if scene == "array" {
+            2
+        } else {
+            0
+        };
+    }
+
     pub fn draw(&self, _data: &GameData, _grid: &Grid, _spirit_stones: u32) {
         // Drawing handled in update for immediate mode
     }
@@ -308,6 +381,10 @@ impl SectBaseState {
             self.crafting_modal_open = false;
         } else if self.placement_mode.is_some() {
             self.placement_mode = None;
+        } else if self.beast_equip_modal_open {
+            self.beast_equip_modal_open = false;
+        } else if self.herb_planting_modal.is_some() {
+            self.herb_planting_modal = None;
         } else if let SectView::BuildingDetails(_) = self.view {
             self.view = SectView::Map;
         } else if let SectView::SpiritBeasts = self.view {
@@ -353,9 +430,7 @@ impl SectBaseState {
                 current_season,
                 discovered_recipes,
             ),
-            SectView::SpiritBeasts => {
-                self.draw_spirit_beasts_view(rect, data, spirit_beasts, inventory)
-            }
+            SectView::SpiritBeasts => None,
         }
     }
 }

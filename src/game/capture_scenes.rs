@@ -7,6 +7,9 @@ use crate::state::{
 };
 impl Game {
     pub(super) fn prepare_management_capture(&mut self, scene: &str) -> bool {
+        if self.prepare_facility_scene(scene) {
+            return true;
+        }
         if !matches!(
             scene,
             "roster"
@@ -72,6 +75,57 @@ impl Game {
                 }
             }
         }
+        true
+    }
+    fn prepare_facility_scene(&mut self, scene: &str) -> bool {
+        if !matches!(
+            scene,
+            "garden"
+                | "seeds"
+                | "attendants"
+                | "array"
+                | "storage"
+                | "drying"
+                | "workshop"
+                | "guardians"
+                | "mission_board"
+        ) {
+            return false;
+        }
+        self.execute_action(Action::StartNewGame("Fallen Peak".to_owned()));
+        self.active_moment = None;
+        let kind = match scene {
+            "storage" => BuildingType::HerbStorage,
+            "drying" => BuildingType::DryingPavilion,
+            "workshop" => BuildingType::AlchemyFurnace,
+            "mission_board" => BuildingType::MissionBoard,
+            _ => BuildingType::Greenhouse,
+        };
+        let mut building = crate::data::buildings::Building::new(kind);
+        building.id = 500;
+        building.level = 3;
+        building.sync_herb_plots();
+        self.data.buildings.push(building);
+        for herb in self.data.herbs.values() {
+            self.inventory.insert(herb.id.clone(), 20);
+        }
+        self.discovered_recipes = self.data.recipes.iter().map(|r| r.id.clone()).collect();
+        for item in self.data.items.values() {
+            self.inventory.insert(item.id.clone(), 20);
+        }
+        self.spirit_beasts.clear();
+        if let Some(definition) = self
+            .data
+            .spirit_beast_definitions
+            .values()
+            .min_by(|a, b| a.id.cmp(&b.id))
+        {
+            self.spirit_beasts
+                .push(SpiritBeast::new_from_definition(definition));
+        }
+        let mut state = SectBaseState::new();
+        state.prepare_facility_capture(scene, 500);
+        self.state = GameState::SectBase(state);
         true
     }
 }
