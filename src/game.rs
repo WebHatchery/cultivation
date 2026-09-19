@@ -195,6 +195,18 @@ impl Game {
                 }
             }
             "worldmap" => self.state = GameState::WorldMap(WorldMapState::new()),
+            "trade" => {
+                self.state =
+                    GameState::TradeScreen(crate::state::trade_screen::TradeScreenState::new())
+            }
+            "factions" => {
+                self.state = GameState::FactionScreen(
+                    crate::state::faction_screen::FactionScreenState::new(),
+                )
+            }
+            "library" => {
+                self.state = GameState::Library(crate::state::library::LibraryState::new())
+            }
             _ => {
                 // Default: the boot state, the main menu.
                 self.state = GameState::MainMenu(MainMenuState::new());

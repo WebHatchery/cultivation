@@ -7,80 +7,84 @@ use crate::ui::theme::*;
 use macroquad::prelude::*;
 use macroquad_toolkit::ui::{draw_ui_text, measure_ui_text};
 
-pub struct WorldMapState;
+pub struct WorldMapState {
+    selected: usize,
+    page: usize,
+}
 
 impl WorldMapState {
     pub fn new() -> Self {
-        Self
+        Self {
+            selected: 0,
+            page: 0,
+        }
     }
 
     pub fn update(&mut self, data: &GameData) -> UpdateResult {
-        if is_key_pressed(KeyCode::Escape) {
-            return UpdateResult::new().with_transition(StateTransition::ToSectBase);
-        }
-
-        let screen_w = screen_width();
-        let screen_h = screen_height();
-
-        draw_panel(Rect::new(0.0, 0.0, screen_w, 70.0), None);
-        draw_screen_title(
-            "Outside Route Map",
-            "Routes, threats, and powers beyond the mountain gate",
-            24.0,
-            34.0,
-        );
-
-        let map_rect = Rect::new(28.0, 90.0, screen_w - 56.0, screen_h - 158.0);
-        self.draw_map_ground(map_rect);
-
-        let player_pos = vec2(
-            map_rect.x + map_rect.w * 0.47,
-            map_rect.y + map_rect.h * 0.60,
-        );
-        for node in &data.map_nodes {
-            let node_pos = map_node_pos(map_rect, node);
-            draw_route(
-                player_pos,
-                node_pos,
-                Color::new(PRIMARY.r, PRIMARY.g, PRIMARY.b, 0.32),
-            );
-        }
-
-        for (idx, faction) in data.factions.iter().enumerate() {
-            let pos = faction_anchor(map_rect, idx);
-            draw_route(
-                player_pos,
-                pos,
-                Color::new(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b, 0.16),
-            );
-            self.draw_faction_marker(pos, faction);
-        }
-
-        self.draw_player_sect(player_pos);
-        for node in &data.map_nodes {
-            self.draw_region_node(map_node_pos(map_rect, node), node);
-        }
-
-        draw_panel(
-            Rect::new(28.0, screen_h - 58.0, screen_w - 176.0, 44.0),
-            None,
-        );
-        draw_ui_text(
-            "Every road is a wager: herbs for survival, ruins for legacy, enemies for prestige.",
-            44.0,
-            screen_h - 30.0,
-            FONT_BODY_SIZE,
-            TEXT_SECONDARY,
-        );
-
-        if draw_button(
-            Rect::new(screen_w - 128.0, screen_h - 58.0, 100.0, 40.0),
-            "Return",
-            false,
+        use crate::ui::workspace as ux;
+        if ux::header(
+            "Outside Routes",
+            "Select a region to inspect danger. Issue expeditions from the Mission Board.",
         ) {
             return UpdateResult::new().with_transition(StateTransition::ToSectBase);
         }
-
+        let (list, detail) = ux::split(ux::content());
+        self.selected = self.selected.min(data.map_nodes.len().saturating_sub(1));
+        let range = ux::page(list, data.map_nodes.len(), 64.0, &mut self.page);
+        for (row, index) in range.enumerate() {
+            if ux::button(
+                Rect::new(list.x, list.y + row as f32 * 64.0, list.w, 52.0),
+                &data.map_nodes[index].name,
+                self.selected == index,
+                true,
+            ) {
+                self.selected = index;
+            }
+        }
+        let map = Rect::new(detail.x, detail.y, detail.w, detail.h - 112.0);
+        ux::clipped(map, || {
+            self.draw_map_ground(map);
+            let home = vec2(map.x + map.w * 0.47, map.y + map.h * 0.60);
+            for (index, node) in data.map_nodes.iter().enumerate() {
+                let position = map_node_pos(map, node);
+                let selected = index == self.selected;
+                if selected {
+                    draw_route(home, position, PRIMARY);
+                }
+                draw_circle(
+                    position.x,
+                    position.y,
+                    if selected { 10.0 } else { 5.0 },
+                    if selected { PRIMARY } else { PANEL_BORDER },
+                );
+                if selected {
+                    draw_circle_lines(position.x, position.y, 16.0, 2.0, PRIMARY);
+                }
+            }
+            self.draw_player_sect(home);
+        });
+        let info = Rect::new(detail.x, detail.y + detail.h - 100.0, detail.w, 100.0);
+        draw_panel(info, None);
+        if let Some(node) = data.map_nodes.get(self.selected) {
+            draw_ui_text(
+                &node.name,
+                info.x + 16.0,
+                info.y + 30.0,
+                FONT_BODY_SIZE,
+                PRIMARY,
+            );
+            draw_ui_text(
+                &format!(
+                    "Threat {} / Corruption {}",
+                    node.danger_level + node.corruption / 10,
+                    node.corruption
+                ),
+                info.x + 16.0,
+                info.y + 62.0,
+                FONT_BODY_SIZE,
+                TEXT_PRIMARY,
+            );
+        }
         UpdateResult::new()
     }
 
@@ -265,57 +269,6 @@ impl WorldMapState {
         );
     }
 
-    fn draw_region_node(&self, pos: Vec2, node: &MapNode) {
-        let total_danger = node.danger_level + (node.corruption / 10);
-        let danger_color = if total_danger >= 6 {
-            FAILURE
-        } else if total_danger >= 3 {
-            WARNING
-        } else {
-            SECONDARY
-        };
-        draw_location_banner(pos, &node.name, danger_color);
-        draw_circle(pos.x, pos.y + 30.0, 7.0, danger_color);
-        // Threat/corruption sits on the pale map ground, so back it with a dark
-        // ink scrim; colored text alone on beige is nearly unreadable.
-        let stat_line = format!("Threat {} | Corruption {}", total_danger, node.corruption);
-        draw_scrim_label(vec2(pos.x + 26.0, pos.y + 42.0), &stat_line, danger_color);
-
-        let hit = Rect::new(pos.x - 24.0, pos.y - 24.0, 48.0, 48.0);
-        if hit.contains(mouse_position().into()) {
-            draw_circle_lines(pos.x, pos.y, 32.0, 2.0, TEXT_HIGHLIGHT);
-            draw_tooltip(
-                mouse_position().into(),
-                &format!("{}: threat {}", node.name, total_danger),
-            );
-        }
-    }
-
-    fn draw_faction_marker(&self, pos: Vec2, faction: &Faction) {
-        let color = faction_color(&faction.faction_type);
-        draw_sect_seal(pos, color);
-        draw_ui_text(
-            &short_name(&faction.name),
-            pos.x - 44.0,
-            pos.y + 33.0,
-            FONT_SMALL_SIZE,
-            Color::new(0.18, 0.10, 0.06, 0.90),
-        );
-
-        let hit = Rect::new(pos.x - 52.0, pos.y - 28.0, 104.0, 70.0);
-        if hit.contains(mouse_position().into()) {
-            draw_rectangle_lines(pos.x - 56.0, pos.y - 32.0, 112.0, 76.0, 2.0, PRIMARY);
-            draw_tooltip(
-                mouse_position().into(),
-                &format!(
-                    "{}\nRealm: {}",
-                    faction.name,
-                    realm_label(&faction.leader_realm)
-                ),
-            );
-        }
-    }
-
     pub fn draw(&self, _data: &GameData, _spirit_stones: u32) {
         // Handled in update.
     }
@@ -324,20 +277,6 @@ impl WorldMapState {
 fn map_node_pos(rect: Rect, node: &MapNode) -> Vec2 {
     let x = (node.x / 500.0).clamp(0.10, 0.90);
     let y = (node.y / 500.0).clamp(0.12, 0.86);
-    vec2(rect.x + rect.w * x, rect.y + rect.h * y)
-}
-
-fn faction_anchor(rect: Rect, idx: usize) -> Vec2 {
-    const ANCHORS: &[(f32, f32)] = &[
-        (0.72, 0.18),
-        (0.22, 0.22),
-        (0.78, 0.72),
-        (0.52, 0.13),
-        (0.88, 0.42),
-        (0.15, 0.66),
-        (0.42, 0.82),
-    ];
-    let (x, y) = ANCHORS[idx % ANCHORS.len()];
     vec2(rect.x + rect.w * x, rect.y + rect.h * y)
 }
 
@@ -358,101 +297,4 @@ fn draw_route(a: Vec2, b: Vec2, color: Color) {
         2.5,
         Color::new(color.r, color.g, color.b, color.a + 0.12),
     );
-}
-
-fn draw_location_banner(pos: Vec2, name: &str, color: Color) {
-    let w = 110.0;
-    let h = 34.0;
-    draw_rectangle(
-        pos.x - w * 0.5,
-        pos.y - h * 0.5,
-        w,
-        h,
-        Color::new(0.18, 0.10, 0.06, 0.78),
-    );
-    draw_triangle(
-        vec2(pos.x - w * 0.5, pos.y + h * 0.5),
-        vec2(pos.x - w * 0.5 + 12.0, pos.y + h * 0.5),
-        vec2(pos.x - w * 0.5, pos.y + h * 0.5 + 10.0),
-        Color::new(0.18, 0.10, 0.06, 0.78),
-    );
-    draw_rectangle_lines(
-        pos.x - w * 0.5,
-        pos.y - h * 0.5,
-        w,
-        h,
-        1.0,
-        Color::new(color.r, color.g, color.b, 0.82),
-    );
-    draw_ui_text(
-        name,
-        pos.x - w * 0.5 + 10.0,
-        pos.y + 6.0,
-        FONT_SMALL_SIZE,
-        TEXT_PRIMARY,
-    );
-}
-
-fn draw_sect_seal(pos: Vec2, color: Color) {
-    draw_circle(
-        pos.x,
-        pos.y,
-        22.0,
-        Color::new(color.r, color.g, color.b, 0.34),
-    );
-    draw_circle_lines(pos.x, pos.y, 25.0, 2.0, Color::new(0.18, 0.10, 0.06, 0.76));
-    draw_circle_lines(
-        pos.x,
-        pos.y,
-        16.0,
-        1.0,
-        Color::new(PRIMARY.r, PRIMARY.g, PRIMARY.b, 0.62),
-    );
-    draw_line(pos.x - 13.0, pos.y, pos.x + 13.0, pos.y, 2.0, color);
-    draw_line(pos.x, pos.y - 13.0, pos.x, pos.y + 13.0, 2.0, color);
-}
-
-fn faction_color(faction_type: &FactionType) -> Color {
-    match faction_type {
-        FactionType::Sect => SECONDARY,
-        FactionType::MerchantGuild => PRIMARY,
-        FactionType::DemonCult => ACCENT,
-        FactionType::ImperialCourt => WARNING,
-        FactionType::BanditClan => FAILURE,
-        FactionType::BeastHorde => SUCCESS,
-    }
-}
-
-fn faction_sigill(faction_type: &FactionType) -> &'static str {
-    match faction_type {
-        FactionType::Sect => "SECT",
-        FactionType::MerchantGuild => "GUILD",
-        FactionType::DemonCult => "CULT",
-        FactionType::ImperialCourt => "COURT",
-        FactionType::BanditClan => "CLAN",
-        FactionType::BeastHorde => "HORDE",
-    }
-}
-
-fn short_name(name: &str) -> String {
-    name.split_whitespace()
-        .take(2)
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn realm_label(id: &str) -> String {
-    if id.is_empty() {
-        return "Unknown".to_string();
-    }
-    id.split('_')
-        .map(|part| {
-            let mut chars = part.chars();
-            match chars.next() {
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                None => String::new(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }

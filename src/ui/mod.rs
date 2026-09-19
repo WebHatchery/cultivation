@@ -8,3 +8,4 @@ pub mod theme;
 
 pub use fonts::FontManager;
 pub use textures::TextureManager;
+pub mod workspace;

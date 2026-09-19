@@ -150,6 +150,14 @@ impl SectBaseState {
         }
         if self.annals_open {
             self.draw_annals(event_log);
+            if crate::ui::workspace::button(
+                Rect::new(screen_w - 300.0, 32.0, 132.0, 44.0),
+                "Open Archive",
+                false,
+                true,
+            ) {
+                return UpdateResult::new().with_transition(StateTransition::ToLibrary);
+            }
             return UpdateResult::new();
         }
         if self.tech_tree_open {
