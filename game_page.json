@@ -10,16 +10,20 @@
   ],
   "controls": [
     {
-      "key": "Mouse",
-      "desc": "Interact"
+      "key": "Click / Tap",
+      "desc": "Select halls and use visible menu controls"
     },
     {
-      "key": "WASD",
-      "desc": "Pan Camera"
+      "key": "Map controls",
+      "desc": "Pan, zoom, recenter, or cancel placement"
     },
     {
-      "key": "Space",
-      "desc": "Pause"
+      "key": "Mouse wheel",
+      "desc": "Zoom the sect map"
+    },
+    {
+      "key": "Escape",
+      "desc": "Close the current screen"
     }
   ],
   "details": [

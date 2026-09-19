@@ -10,10 +10,24 @@ impl SectBaseState {
         &mut self,
         rect: Rect,
         data: &mut GameData,
-        _grid: &mut Grid,
         textures: &TextureManager,
-        spirit_stones: u32,
-        unlocked_techs: &[String],
+    ) -> Option<UpdateResult> {
+        let viewport = self.sect_map_view_rect(rect);
+        let ui = macroquad_toolkit::ui::VirtualUi::from_responsive_screen_size(
+            screen_width(),
+            screen_height(),
+            1.0,
+        );
+        let result = ui.with_clip(viewport, || self.draw_map_content(rect, data, textures));
+        self.draw_map_controls(rect);
+        result
+    }
+
+    fn draw_map_content(
+        &mut self,
+        rect: Rect,
+        data: &GameData,
+        textures: &TextureManager,
     ) -> Option<UpdateResult> {
         self.draw_mountain_vista(rect);
         let map_rect = self.sect_map_view_rect(rect);
@@ -32,14 +46,6 @@ impl SectBaseState {
             1.5,
             Color::new(PRIMARY.r, PRIMARY.g, PRIMARY.b, 0.24),
         );
-        draw_ui_text(
-            "Mist gathers around the ruined halls of your mountain refuge.",
-            map_rect.x + 18.0,
-            map_rect.y + map_rect.h - 16.0,
-            FONT_SMALL_SIZE,
-            Color::new(TEXT_SECONDARY.r, TEXT_SECONDARY.g, TEXT_SECONDARY.b, 0.72),
-        );
-
         let mouse = vec2(mouse_position().0, mouse_position().1);
 
         if map_rect.contains(mouse.into()) {
@@ -72,22 +78,48 @@ impl SectBaseState {
             }
         }
 
-        if self.crafting_modal_open {
-            return self.draw_construction_modal(data, unlocked_techs, spirit_stones);
-        }
-
         None
     }
 
+    fn draw_map_controls(&mut self, rect: Rect) -> bool {
+        let y = rect.y + rect.h - 50.0;
+        let controls = ["+", "-", "Left", "Right", "Up", "Down", "Home"];
+        let width = ((rect.w - 120.0) / 7.0).min(70.0);
+        for (index, label) in controls.iter().enumerate() {
+            if draw_button(
+                Rect::new(rect.x + index as f32 * (width + 4.0), y, width, 44.0),
+                label,
+                false,
+            ) {
+                match index {
+                    0 => self.map_zoom = (self.map_zoom * 1.2).min(2.0),
+                    1 => self.map_zoom = (self.map_zoom / 1.2).max(0.2),
+                    2 => self.map_center.x -= 120.0 / self.map_zoom,
+                    3 => self.map_center.x += 120.0 / self.map_zoom,
+                    4 => self.map_center.y -= 120.0 / self.map_zoom,
+                    5 => self.map_center.y += 120.0 / self.map_zoom,
+                    _ => {
+                        self.map_center = vec2(SECT_MAP_WIDTH / 2.0, SECT_MAP_HEIGHT / 2.0);
+                        self.map_zoom = 0.35;
+                    }
+                }
+            }
+        }
+        if self.placement_mode.is_some()
+            && draw_button(
+                Rect::new(rect.x + rect.w - 90.0, y, 90.0, 44.0),
+                "Cancel",
+                false,
+            )
+        {
+            self.placement_mode = None;
+            return true;
+        }
+        false
+    }
+
     fn sect_map_view_rect(&self, rect: Rect) -> Rect {
-        let side_clearance = 260.0;
-        let right_clearance = 300.0;
-        Rect::new(
-            rect.x + side_clearance,
-            rect.y + 8.0,
-            (rect.w - side_clearance - right_clearance).max(420.0),
-            rect.h - 16.0,
-        )
+        Rect::new(rect.x, rect.y, rect.w, rect.h - 60.0)
     }
 
     fn handle_map_drag(&mut self, rect: Rect, mouse: Vec2) {

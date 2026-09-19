@@ -1,5 +1,6 @@
+//! Sect navigation, treasury and on-demand history.
 use super::*;
-use macroquad_toolkit::ui::{draw_ui_text, measure_ui_text};
+use macroquad_toolkit::ui::draw_ui_text;
 
 impl SectBaseState {
     pub(super) fn draw_header(
@@ -21,266 +22,248 @@ impl SectBaseState {
         } else {
             sect_name
         };
-        draw_screen_title(title, "Mountain command ledger", 20.0, 31.0);
-
-        let title_w = measure_ui_text(title, None, FONT_TITLE_SIZE as u16, 1.0).width;
-        herbs::draw_season_indicator(20.0 + title_w + 28.0, 40.0, current_season, season_ticks);
-
-        let mut res_x = screen_w - 620.0;
-        res_x += draw_resource_seal(res_x, 38.0, "Spirit Stones", spirit_stones, PRIMARY) + 8.0;
-        res_x += draw_resource_seal(res_x, 38.0, "Medicinal Herbs", herbs, SUCCESS) + 8.0;
-        res_x += draw_resource_seal(res_x, 38.0, "Sect Prestige", influence, SECONDARY) + 8.0;
-        draw_resource_seal(res_x, 38.0, "Ancient Relics", relics, WARNING);
-
-        if tutorial.active && tutorial.hidden {
-            if draw_button(Rect::new(screen_w - 100.0, 10.0, 40.0, 40.0), "?", false) {
-                tutorial.hidden = false;
-            }
+        draw_ui_text(title, 24.0, 38.0, FONT_HEADER_SIZE, PRIMARY);
+        herbs::draw_season_indicator(24.0, 65.0, current_season, season_ticks);
+        let resources = [
+            ("Stones", spirit_stones, PRIMARY),
+            ("Herbs", herbs, SUCCESS),
+            ("Prestige", influence, SECONDARY),
+            ("Relics", relics, WARNING),
+        ];
+        let start = (screen_w * 0.30).max(240.0);
+        let cell_w = (screen_w - start - 24.0) / 4.0;
+        for (i, (label, value, color)) in resources.iter().enumerate() {
+            let x = start + i as f32 * cell_w;
+            draw_ui_text(label, x, 30.0, FONT_SMALL_SIZE, TEXT_SECONDARY);
+            draw_ui_text(&value.to_string(), x, 58.0, FONT_HEADER_SIZE, *color);
         }
-
-        if draw_button(Rect::new(screen_w - 50.0, 10.0, 40.0, 40.0), "S", false) {
-            self.settings_open = !self.settings_open;
+        if draw_button(
+            Rect::new(screen_w - 118.0, 66.0, 102.0, 40.0),
+            "Settings",
+            false,
+        ) {
+            self.settings_open = true;
+        }
+        if draw_button(
+            Rect::new(screen_w - 230.0, 66.0, 102.0, 40.0),
+            "Annals",
+            false,
+        ) {
+            self.annals_open = true;
+            self.annals_page = 0;
+        }
+        if tutorial.active
+            && tutorial.hidden
+            && draw_button(
+                Rect::new(screen_w - 342.0, 66.0, 102.0, 40.0),
+                "Guide",
+                false,
+            )
+        {
+            tutorial.hidden = false;
         }
     }
 
     pub(super) fn draw_left_panel(
         &mut self,
-        header_h: f32,
+        top: f32,
         screen_h: f32,
         width: f32,
         data: &GameData,
     ) -> Option<UpdateResult> {
-        let rect = Rect::new(16.0, header_h + 16.0, width, screen_h - header_h - 32.0);
+        let rect = Rect::new(16.0, top + 12.0, width, screen_h - top - 24.0);
         draw_panel(rect, Some("Sect Grounds"));
-        draw_rectangle(
-            rect.x,
-            rect.y,
-            rect.w,
-            rect.h,
-            Color::new(0.0, 0.0, 0.0, 0.16),
-        );
-
-        self.draw_mountain_mandate(rect, data);
-
-        let mut btn_y = rect.y + 162.0;
-        for building in &data.buildings {
-            let status_str = match building.status {
+        let x = rect.x + 10.0;
+        if draw_button(
+            Rect::new(x, rect.y + 50.0, width - 20.0, 44.0),
+            "Mountain Map",
+            matches!(self.view, SectView::Map),
+        ) {
+            self.view = SectView::Map;
+        }
+        let nav_top = rect.y + rect.h - 174.0;
+        let per_page = ((nav_top - rect.y - 150.0) / 46.0).floor().max(1.0) as usize;
+        let pages = data.buildings.len().div_ceil(per_page).max(1);
+        self.building_page = self.building_page.min(pages - 1);
+        for (row, building) in data
+            .buildings
+            .iter()
+            .skip(self.building_page * per_page)
+            .take(per_page)
+            .enumerate()
+        {
+            let status = match building.status {
                 BuildingStatus::Active => "",
-                BuildingStatus::Ruined => " (Ruined)",
-                BuildingStatus::Constructing => " (Raising...)",
+                BuildingStatus::Ruined => " / Ruin",
+                BuildingStatus::Constructing => " / Raising",
             };
-            let label = format!("{}{}", building.building_type, status_str);
-
-            let btn_rect = Rect::new(rect.x + 10.0, btn_y, width - 20.0, 35.0);
-            if matches!(self.view, SectView::Map) {
-                match building.building_type {
-                    BuildingType::SectHall => {
-                        self.register_tutorial_target(0, btn_rect);
-                        self.register_tutorial_target(1, btn_rect);
-                        self.register_tutorial_target(3, btn_rect);
+            let label = format!("{}{}", building.building_type, status);
+            let btn = Rect::new(x, rect.y + 102.0 + row as f32 * 46.0, width - 20.0, 44.0);
+            match building.building_type {
+                BuildingType::SectHall => {
+                    for step in [0, 1, 3] {
+                        self.register_tutorial_target(step, btn);
                     }
-                    BuildingType::MissionBoard => {
-                        self.register_tutorial_target(4, btn_rect);
-                    }
-                    _ => {}
                 }
+                BuildingType::MissionBoard => self.register_tutorial_target(4, btn),
+                _ => {}
             }
-            if draw_button_muted(btn_rect, &label, false) {
+            if draw_button(
+                btn,
+                &label,
+                self.view == SectView::BuildingDetails(building.id),
+            ) {
                 self.view = SectView::BuildingDetails(building.id);
             }
-            btn_y += 40.0;
-
-            if btn_y > rect.y + rect.h - 315.0 {
-                draw_ui_text("...", rect.x + 10.0, btn_y, FONT_SMALL_SIZE, TEXT_SECONDARY);
-                break;
+        }
+        if pages > 1 {
+            let y = nav_top - 50.0;
+            if self.building_page > 0 && draw_button(Rect::new(x, y, 64.0, 44.0), "Prev", false) {
+                self.building_page -= 1;
+            }
+            draw_ui_text(
+                &format!("{}/{}", self.building_page + 1, pages),
+                x + 82.0,
+                y + 28.0,
+                FONT_SMALL_SIZE,
+                TEXT_SECONDARY,
+            );
+            if self.building_page + 1 < pages
+                && draw_button(Rect::new(x + width - 84.0, y, 64.0, 44.0), "Next", false)
+            {
+                self.building_page += 1;
             }
         }
-
-        let nav_y_start = rect.y + rect.h - 270.0;
-        draw_ink_divider(rect.x + 14.0, nav_y_start - 16.0, width - 28.0);
-        draw_ui_text(
-            "Patriarch's Ledgers",
-            rect.x + 14.0,
-            nav_y_start - 24.0,
-            FONT_SMALL_SIZE,
-            TEXT_SECONDARY,
-        );
-        if draw_button_muted(
-            Rect::new(rect.x + 10.0, nav_y_start, width - 20.0, 40.0),
-            "Disciple Scrolls",
-            false,
-        ) {
-            return Some(UpdateResult::new().with_transition(StateTransition::ToDiscipleRoster));
+        draw_ink_divider(x, nav_top - 8.0, width - 20.0);
+        let labels = [
+            "Disciples",
+            "Routes",
+            "Powers",
+            "Trade",
+            "Raise Halls",
+            "Guardians",
+        ];
+        let cell = (width - 24.0) / 2.0;
+        for (index, label) in labels.iter().enumerate() {
+            let btn = Rect::new(
+                x + (index % 2) as f32 * (cell + 4.0),
+                nav_top + (index / 2) as f32 * 54.0,
+                cell,
+                48.0,
+            );
+            if index == 4 {
+                self.register_tutorial_target(2, btn);
+            }
+            if draw_button(btn, label, false) {
+                let transition = match index {
+                    0 => Some(StateTransition::ToDiscipleRoster),
+                    1 => Some(StateTransition::ToWorldMap),
+                    2 => Some(StateTransition::ToFactionScreen),
+                    3 => Some(StateTransition::ToTradeScreen),
+                    4 => {
+                        self.view = SectView::Map;
+                        self.crafting_modal_open = true;
+                        None
+                    }
+                    _ => {
+                        self.view = SectView::SpiritBeasts;
+                        None
+                    }
+                };
+                if let Some(transition) = transition {
+                    return Some(UpdateResult::new().with_transition(transition));
+                }
+            }
         }
-        if draw_button_muted(
-            Rect::new(rect.x + 10.0, nav_y_start + 50.0, width - 20.0, 40.0),
-            "Outside Routes",
-            false,
-        ) {
-            return Some(UpdateResult::new().with_transition(StateTransition::ToWorldMap));
-        }
-        if draw_button_muted(
-            Rect::new(rect.x + 10.0, nav_y_start + 100.0, width - 20.0, 40.0),
-            "Regional Powers",
-            false,
-        ) {
-            return Some(UpdateResult::new().with_transition(StateTransition::ToFactionScreen));
-        }
-        if draw_button_muted(
-            Rect::new(rect.x + 10.0, nav_y_start + 150.0, width - 20.0, 40.0),
-            "Caravan Ledger",
-            false,
-        ) {
-            return Some(UpdateResult::new().with_transition(StateTransition::ToTradeScreen));
-        }
-        let raise_rect = Rect::new(rect.x + 10.0, nav_y_start + 200.0, width - 20.0, 40.0);
-        if !self.crafting_modal_open {
-            self.register_tutorial_target(2, raise_rect);
-        }
-        if draw_button_muted(raise_rect, "Raise Halls", false) {
-            self.view = SectView::Map;
-            self.crafting_modal_open = true;
-        }
-        if draw_button_muted(
-            Rect::new(rect.x + 10.0, nav_y_start + 250.0, width - 20.0, 40.0),
-            "Mountain Guardians",
-            false,
-        ) {
-            self.view = SectView::SpiritBeasts;
-        }
-
         None
     }
 
-    fn draw_mountain_mandate(&self, rect: Rect, data: &GameData) {
-        let active = data
-            .buildings
-            .iter()
-            .filter(|b| b.status == BuildingStatus::Active)
-            .count() as u32;
-        let ruined = data
-            .buildings
-            .iter()
-            .filter(|b| b.status == BuildingStatus::Ruined)
-            .count() as u32;
-        let raising = data
-            .buildings
-            .iter()
-            .filter(|b| b.status == BuildingStatus::Constructing)
-            .count() as u32;
-        let y = rect.y + 52.0;
-
+    pub(super) fn draw_annals(&mut self, events: &[String]) {
+        let rect = Rect::new(24.0, 24.0, screen_width() - 48.0, screen_height() - 48.0);
+        draw_panel(rect, Some("Sect Annals"));
+        if draw_button(
+            Rect::new(rect.x + rect.w - 132.0, rect.y + 8.0, 116.0, 44.0),
+            "Back to Sect",
+            false,
+        ) {
+            self.annals_open = false;
+        }
         draw_ui_text(
-            "Mountain Mandate",
-            rect.x + 14.0,
-            y,
+            "Latest events first",
+            rect.x + 24.0,
+            rect.y + 76.0,
             FONT_SMALL_SIZE,
-            TEXT_HIGHLIGHT,
+            SECONDARY,
         );
-        draw_ink_divider(rect.x + 14.0, y + 10.0, rect.w - 28.0);
-        draw_small_mandate_stat(rect.x + 14.0, y + 38.0, "Active", active, SUCCESS);
-        draw_small_mandate_stat(rect.x + 88.0, y + 38.0, "Ruined", ruined, FAILURE);
-        draw_small_mandate_stat(rect.x + 162.0, y + 38.0, "Raising", raising, WARNING);
+        let mut pages: Vec<Vec<&String>> = vec![Vec::new()];
+        let available = rect.h - 180.0;
+        let mut used = 0.0;
+        for event in events.iter().rev() {
+            let lines = macroquad_toolkit::ui::wrap_text(event, rect.w - 64.0, FONT_BODY_SIZE);
+            let needed = lines.len() as f32 * (FONT_BODY_SIZE + 5.0) + 16.0;
+            if used + needed > available && !pages.last().unwrap().is_empty() {
+                pages.push(Vec::new());
+                used = 0.0;
+            }
+            pages.last_mut().unwrap().push(event);
+            used += needed;
+        }
+        self.annals_page = self.annals_page.min(pages.len() - 1);
+        let mut y = rect.y + 112.0;
+        let ui = macroquad_toolkit::ui::VirtualUi::from_responsive_screen_size(
+            screen_width(),
+            screen_height(),
+            1.0,
+        );
+        ui.with_clip(
+            Rect::new(rect.x, y - 24.0, rect.w, available + 24.0),
+            || {
+                for event in &pages[self.annals_page] {
+                    y = draw_wrapped_text(
+                        event,
+                        rect.x + 24.0,
+                        y,
+                        rect.w - 64.0,
+                        FONT_BODY_SIZE,
+                        TEXT_PRIMARY,
+                    ) + 16.0;
+                }
+            },
+        );
+        let footer = rect.y + rect.h - 56.0;
+        if self.annals_page > 0
+            && draw_button(
+                Rect::new(rect.x + 24.0, footer, 120.0, 44.0),
+                "Newer",
+                false,
+            )
+        {
+            self.annals_page -= 1;
+        }
+        if self.annals_page + 1 < pages.len()
+            && draw_button(
+                Rect::new(rect.x + rect.w - 144.0, footer, 120.0, 44.0),
+                "Older",
+                false,
+            )
+        {
+            self.annals_page += 1;
+        }
         draw_ui_text(
-            "Restore halls before ambition outruns shelter.",
-            rect.x + 14.0,
-            y + 88.0,
+            &format!("{} / {}", self.annals_page + 1, pages.len()),
+            rect.x + rect.w * 0.5,
+            footer + 28.0,
             FONT_SMALL_SIZE,
             TEXT_SECONDARY,
         );
-    }
-
-    pub(super) fn draw_right_panel(
-        &self,
-        header_h: f32,
-        screen_h: f32,
-        left_w: f32,
-        center_w: f32,
-        width: f32,
-        event_log: &[String],
-    ) {
-        let rect = Rect::new(
-            screen_width() - width - 16.0,
-            header_h + 16.0,
-            width,
-            screen_h - header_h - 32.0,
-        );
-        self.draw_event_log_panel(rect, event_log, screen_h);
-    }
-
-    fn draw_event_log_panel(&self, rect: Rect, event_log: &[String], screen_h: f32) {
-        draw_panel(rect, Some("Sect Annals"));
-        draw_rectangle(
-            rect.x,
-            rect.y,
-            rect.w,
-            rect.h,
-            Color::new(0.0, 0.0, 0.0, 0.22),
-        );
-
-        draw_ui_text(
-            "Recent Edicts and Omens",
-            rect.x + 14.0,
-            rect.y + 52.0,
-            FONT_SMALL_SIZE,
-            TEXT_HIGHLIGHT,
-        );
-        draw_ink_divider(rect.x + 14.0, rect.y + 62.0, rect.w - 28.0);
-
-        if event_log.is_empty() {
-            draw_wrapped_text(
-                "The annals are waiting for the patriarch's first decree.",
-                rect.x + 14.0,
-                rect.y + 98.0,
-                rect.w - 28.0,
+        if events.is_empty() {
+            draw_ui_text(
+                "Your sect's story begins here.",
+                rect.x + 24.0,
+                y,
                 FONT_BODY_SIZE,
                 TEXT_SECONDARY,
             );
-            return;
-        }
-
-        let mut log_y = rect.y + 96.0;
-        let max_width = rect.w - 36.0;
-
-        for (idx, event) in event_log.iter().rev().take(20).enumerate() {
-            let event_color = self.event_color(event, idx);
-            draw_circle(
-                rect.x + 13.0,
-                log_y - 6.0,
-                3.0,
-                Color::new(event_color.r, event_color.g, event_color.b, event_color.a),
-            );
-            log_y = draw_wrapped_text(
-                event,
-                rect.x + 22.0,
-                log_y,
-                max_width,
-                FONT_SMALL_SIZE,
-                event_color,
-            );
-            log_y += 6.0;
-            if log_y > screen_h - 20.0 {
-                break;
-            }
-        }
-    }
-
-    fn event_color(&self, event: &str, idx: usize) -> Color {
-        let lower = event.to_ascii_lowercase();
-        let base_alpha = (0.95 - idx as f32 * 0.02).clamp(0.60, 0.95);
-        if lower.contains("breakthrough") || lower.contains("ready") {
-            Color::new(WARNING.r, WARNING.g, WARNING.b, base_alpha)
-        } else if lower.contains("war") || lower.contains("cannot") || lower.contains("danger") {
-            Color::new(FAILURE.r, FAILURE.g, FAILURE.b, base_alpha)
-        } else if lower.contains("recovered") || lower.contains("saved") {
-            Color::new(SUCCESS.r, SUCCESS.g, SUCCESS.b, base_alpha)
-        } else {
-            Color::new(
-                TEXT_SECONDARY.r,
-                TEXT_SECONDARY.g,
-                TEXT_SECONDARY.b,
-                base_alpha,
-            )
         }
     }
 
@@ -324,15 +307,4 @@ impl SectBaseState {
         }
         None
     }
-}
-
-fn draw_small_mandate_stat(x: f32, y: f32, label: &str, value: u32, color: Color) {
-    draw_ui_text(label, x, y, FONT_SMALL_SIZE, TEXT_SECONDARY);
-    draw_ui_text(
-        &value.to_string(),
-        x,
-        y + 20.0,
-        FONT_BODY_SIZE,
-        Color::new(color.r, color.g, color.b, 0.92),
-    );
 }

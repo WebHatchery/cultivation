@@ -43,21 +43,19 @@ impl SectBaseState {
             total_steps
         );
 
-        let card_w = 480.0;
-        let card_h = 128.0;
-        let rect = Rect::new((screen_w - card_w) / 2.0, header_h + 12.0, card_w, card_h);
+        let rect = Rect::new(16.0, header_h + 4.0, screen_w - 32.0, 104.0);
 
         draw_panel(rect, Some(&header));
 
         if draw_button(
-            Rect::new(rect.x + rect.w - 148.0, rect.y + 8.0, 64.0, 26.0),
+            Rect::new(rect.x + rect.w - 148.0, rect.y + 8.0, 64.0, 44.0),
             "Hide",
             false,
         ) {
             tutorial.hidden = true;
         }
         if draw_button(
-            Rect::new(rect.x + rect.w - 76.0, rect.y + 8.0, 64.0, 26.0),
+            Rect::new(rect.x + rect.w - 76.0, rect.y + 8.0, 64.0, 44.0),
             "Skip",
             false,
         ) {
@@ -67,14 +65,14 @@ impl SectBaseState {
         draw_ui_text(
             title,
             rect.x + 16.0,
-            rect.y + 66.0,
+            rect.y + 64.0,
             FONT_BODY_SIZE,
             TEXT_HIGHLIGHT,
         );
         draw_wrapped_text(
             body,
             rect.x + 16.0,
-            rect.y + 92.0,
+            rect.y + 88.0,
             rect.w - 32.0,
             FONT_SMALL_SIZE,
             TEXT_SECONDARY,

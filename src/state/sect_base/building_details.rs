@@ -21,6 +21,19 @@ impl SectBaseState {
         let building = data.buildings.iter().find(|b| b.id == id)?.clone();
         let b_type = building.building_type.clone();
 
+        if self.crafting_modal_open {
+            return self.draw_building_modals(
+                data,
+                &b_type,
+                spirit_stones,
+                herbs,
+                inventory,
+                unlocked_techs,
+                disciples,
+                discovered_recipes,
+            );
+        }
+        draw_panel(rect, None);
         self.draw_building_header(rect, &building, data, disciples);
 
         if draw_button(
@@ -85,18 +98,18 @@ impl SectBaseState {
         draw_ui_text(
             &format!("{}", b_type),
             rect.x + 20.0,
-            rect.y + 60.0,
+            rect.y + 38.0,
             FONT_HEADER_SIZE,
             PRIMARY,
         );
         draw_ui_text(
             status_label,
             rect.x + 20.0,
-            rect.y + 84.0,
+            rect.y + 66.0,
             FONT_SMALL_SIZE,
             status_color(&building.status),
         );
-        let d_y = rect.y + 100.0;
+        let d_y = rect.y + 82.0;
         draw_ui_text(
             &format!("Hall Grade: {}", building.level),
             rect.x + 20.0,
@@ -129,9 +142,9 @@ impl SectBaseState {
         if let Some(def) = data.building_definitions.get(&building.building_type) {
             draw_wrapped_text(
                 &def.description,
-                rect.x + 300.0,
-                rect.y + 72.0,
-                (rect.w - 340.0).max(220.0),
+                rect.x + rect.w * 0.48,
+                rect.y + 100.0,
+                rect.w * 0.52 - 24.0,
                 FONT_BODY_SIZE,
                 TEXT_SECONDARY,
             );
@@ -145,7 +158,7 @@ impl SectBaseState {
         data: &GameData,
         disciples: &[Disciple],
     ) -> f32 {
-        let d_y = rect.y + 100.0;
+        let d_y = rect.y + 82.0;
         let mut action_y = d_y + 100.0;
 
         if building.building_type == BuildingType::SectHall {
@@ -239,7 +252,7 @@ impl SectBaseState {
         draw_ui_text(
             "(Ruined)",
             rect.x + 200.0,
-            rect.y + 60.0,
+            rect.y + 38.0,
             FONT_HEADER_SIZE,
             Color::new(0.8, 0.2, 0.2, 1.0),
         );
@@ -273,41 +286,52 @@ impl SectBaseState {
         b_type: &BuildingType,
         action_y: f32,
     ) -> Option<UpdateResult> {
-        if draw_button(
-            Rect::new(rect.x + 20.0, action_y, 150.0, 40.0),
-            "Raise Grade (50 SS)",
-            false,
-        ) {
-            return Some(UpdateResult::new().with_action(Action::UpgradeBuilding(b_type.clone())));
-        }
-
+        let x = rect.x + 20.0;
+        let button_w = (rect.w - 56.0) / 3.0;
         if *b_type == BuildingType::SectHall {
-            let accept_rect = Rect::new(rect.x + 180.0, action_y, 150.0, 40.0);
-            self.register_tutorial_target(3, accept_rect);
-            if draw_button(accept_rect, "Accept Disciple", false) {
-                return Some(UpdateResult::new().with_action(Action::RecruitDisciple));
-            }
-            let doctrine_rect = Rect::new(rect.x + 340.0, action_y, 150.0, 40.0);
-            self.register_tutorial_target(1, doctrine_rect);
-            if draw_button(doctrine_rect, "Recover Doctrine", false) {
+            let doctrine = Rect::new(x, action_y, button_w, 48.0);
+            self.register_tutorial_target(1, doctrine);
+            if draw_button(doctrine, "Recover Doctrine", true) {
                 self.tech_tree_open = true;
             }
-        } else if matches!(
-            b_type,
-            BuildingType::AlchemyFurnace
-                | BuildingType::ArtifactForge
-                | BuildingType::Blacksmith
-                | BuildingType::TalismanScriptorium
-        ) {
+            let recruit = Rect::new(x + button_w + 8.0, action_y, button_w, 48.0);
+            self.register_tutorial_target(3, recruit);
+            if draw_button(recruit, "Accept Disciple", false) {
+                return Some(UpdateResult::new().with_action(Action::RecruitDisciple));
+            }
             if draw_button(
-                Rect::new(rect.x + 180.0, action_y, 150.0, 40.0),
+                Rect::new(x + 2.0 * (button_w + 8.0), action_y, button_w, 48.0),
+                "Raise Grade (50 SS)",
+                false,
+            ) {
+                return Some(
+                    UpdateResult::new().with_action(Action::UpgradeBuilding(b_type.clone())),
+                );
+            }
+        } else {
+            if draw_button(
+                Rect::new(x, action_y, button_w, 48.0),
+                "Raise Grade (50 SS)",
+                false,
+            ) {
+                return Some(
+                    UpdateResult::new().with_action(Action::UpgradeBuilding(b_type.clone())),
+                );
+            }
+            if matches!(
+                b_type,
+                BuildingType::AlchemyFurnace
+                    | BuildingType::ArtifactForge
+                    | BuildingType::Blacksmith
+                    | BuildingType::TalismanScriptorium
+            ) && draw_button(
+                Rect::new(x + button_w + 8.0, action_y, button_w, 48.0),
                 "Open Workshop",
                 false,
             ) {
                 self.crafting_modal_open = true;
             }
         }
-
         None
     }
 
@@ -322,26 +346,6 @@ impl SectBaseState {
         disciples: &[Disciple],
         discovered_recipes: &[String],
     ) -> Option<UpdateResult> {
-        if self.tech_tree_open {
-            let (screen_w, screen_h) = (screen_width(), screen_height());
-            let modal_w = 650.0;
-            let modal_x = (screen_w - modal_w) / 2.0;
-            let modal_y = (screen_h - 550.0) / 2.0;
-
-            let action = tech::draw_tech_tree_modal(
-                &mut self.tech_tree_state,
-                data,
-                unlocked_techs,
-                spirit_stones,
-            );
-
-            if tech::check_tech_tree_close(modal_x, modal_y, modal_w) {
-                self.tech_tree_open = false;
-            } else if let Some(action) = action {
-                return Some(UpdateResult::new().with_action(action));
-            }
-        }
-
         if self.crafting_modal_open {
             if let Some(res) = self.draw_crafting_modal(
                 data,

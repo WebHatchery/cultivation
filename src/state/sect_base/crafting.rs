@@ -29,20 +29,20 @@ impl SectBaseState {
 
         if draw_button(
             Rect::new(modal_x + modal_w - 76.0, modal_y + 10.0, 64.0, 30.0),
-            "Seal",
+            "Back",
             false,
         ) {
             self.crafting_modal_open = false;
+            return None;
         }
 
         draw_construction_intro(
             Rect::new(modal_x + 22.0, modal_y + 54.0, modal_w - 44.0, 86.0),
-            data,
             spirit_stones,
         );
 
         let content_y = modal_y + 152.0;
-        let content_h = modal_h - 180.0;
+        let content_h = modal_h - 216.0;
         let content_rect = Rect::new(modal_x + 18.0, content_y, modal_w - 36.0, content_h);
 
         let mut build_opts: Vec<_> = data.building_definitions.values().collect();
@@ -63,18 +63,44 @@ impl SectBaseState {
             .collect();
 
         let item_height = 108.0;
-        let total_height = available_defs.len() as f32 * item_height;
+        let per_page = (content_h / item_height).floor().max(1.0) as usize;
+        let pages = available_defs.len().div_ceil(per_page).max(1);
+        let mut page = (self.construction_scroll as usize).min(pages - 1);
         if content_rect.contains(mouse_position().into()) {
-            let wheel = mouse_wheel().1;
-            if total_height > content_h {
-                self.construction_scroll -= wheel * 42.0;
-                self.construction_scroll = self
-                    .construction_scroll
-                    .clamp(0.0, (total_height - content_h).max(0.0));
-            } else {
-                self.construction_scroll = 0.0;
+            if mouse_wheel().1 < 0.0 {
+                page = (page + 1).min(pages - 1);
+            }
+            if mouse_wheel().1 > 0.0 {
+                page = page.saturating_sub(1);
             }
         }
+        let footer_y = modal_y + modal_h - 52.0;
+        if page > 0
+            && draw_button(
+                Rect::new(modal_x + 20.0, footer_y, 100.0, 44.0),
+                "Previous",
+                false,
+            )
+        {
+            page -= 1;
+        }
+        if page + 1 < pages
+            && draw_button(
+                Rect::new(modal_x + modal_w - 120.0, footer_y, 100.0, 44.0),
+                "Next",
+                false,
+            )
+        {
+            page += 1;
+        }
+        self.construction_scroll = page as f32;
+        draw_ui_text(
+            &format!("{} / {}", page + 1, pages),
+            modal_x + modal_w * 0.5 - 20.0,
+            footer_y + 28.0,
+            FONT_SMALL_SIZE,
+            TEXT_SECONDARY,
+        );
 
         if available_defs.is_empty() {
             draw_wrapped_text(
@@ -88,16 +114,12 @@ impl SectBaseState {
             return None;
         }
 
-        let mut b_y = content_y - self.construction_scroll;
-        for def in available_defs {
-            if b_y + item_height < content_y {
-                b_y += item_height;
-                continue;
-            }
-            if b_y > content_y + content_h {
-                break;
-            }
-
+        let mut b_y = content_y;
+        for def in available_defs
+            .into_iter()
+            .skip(page * per_page)
+            .take(per_page)
+        {
             let card = Rect::new(
                 content_rect.x,
                 b_y,
@@ -116,23 +138,6 @@ impl SectBaseState {
             b_y += item_height;
         }
 
-        if total_height > content_h {
-            let track_x = content_rect.x + content_rect.w - 5.0;
-            let track_y = content_y;
-            let track_h = content_h;
-            draw_rectangle(
-                track_x,
-                track_y,
-                3.0,
-                track_h,
-                Color::new(0.0, 0.0, 0.0, 0.32),
-            );
-
-            let handle_h = (content_h * content_h / total_height).max(20.0);
-            let max_offset = (total_height - content_h).max(1.0);
-            let handle_y = track_y + (self.construction_scroll / max_offset) * (track_h - handle_h);
-            draw_rectangle(track_x - 1.0, handle_y, 6.0, handle_h, TEXT_HIGHLIGHT);
-        }
         None
     }
 
@@ -339,53 +344,21 @@ impl SectBaseState {
     }
 }
 
-fn draw_construction_intro(rect: Rect, data: &GameData, spirit_stones: u32) {
-    draw_rectangle(
-        rect.x,
-        rect.y,
-        rect.w,
-        rect.h,
-        Color::new(0.035, 0.026, 0.018, 0.46),
-    );
-    draw_rectangle_lines(
-        rect.x,
-        rect.y,
-        rect.w,
-        rect.h,
-        1.0,
-        Color::new(PRIMARY.r, PRIMARY.g, PRIMARY.b, 0.34),
-    );
-
-    let active = data
-        .buildings
-        .iter()
-        .filter(|b| b.status == BuildingStatus::Active)
-        .count() as u32;
-    let ruined = data
-        .buildings
-        .iter()
-        .filter(|b| b.status == BuildingStatus::Ruined)
-        .count() as u32;
-
+fn draw_construction_intro(rect: Rect, spirit_stones: u32) {
     draw_ui_text(
-        "Choose which hall the patriarch raises next.",
-        rect.x + 14.0,
+        "Choose a hall, then tap a clear spot on the map.",
+        rect.x,
         rect.y + 28.0,
         FONT_BODY_SIZE,
         TEXT_PRIMARY,
     );
     draw_ui_text(
-        "Each foundation changes what the fallen sect can survive.",
-        rect.x + 14.0,
-        rect.y + 52.0,
-        FONT_SMALL_SIZE,
-        TEXT_SECONDARY,
+        &format!("Treasury: {} spirit stones", spirit_stones),
+        rect.x,
+        rect.y + 58.0,
+        FONT_BODY_SIZE,
+        TEXT_HIGHLIGHT,
     );
-
-    let mut x = rect.x + rect.w - 270.0;
-    x += draw_resource_seal(x, rect.y + 50.0, "Treasury", spirit_stones, PRIMARY) + 8.0;
-    x += draw_resource_seal(x, rect.y + 50.0, "Active", active, SUCCESS) + 8.0;
-    draw_resource_seal(x, rect.y + 50.0, "Ruined", ruined, FAILURE);
 }
 
 fn draw_building_plan_card(

@@ -39,6 +39,9 @@ pub(super) enum SectView {
 pub struct SectBaseState {
     pub(super) view: SectView,
     pub(super) settings_open: bool,
+    pub(super) annals_open: bool,
+    pub(super) annals_page: usize,
+    pub(super) building_page: usize,
     pub(super) feng_shui_overlay_active: bool,
     pub(super) crafting_modal_open: bool,
     pub(super) tech_tree_open: bool,
@@ -66,6 +69,9 @@ impl SectBaseState {
         Self {
             view: SectView::Map,
             settings_open: false,
+            annals_open: false,
+            annals_page: 0,
+            building_page: 0,
             feng_shui_overlay_active: false,
             crafting_modal_open: false,
             tech_tree_open: false,
@@ -118,10 +124,8 @@ impl SectBaseState {
 
         let screen_w = screen_width();
         let screen_h = screen_height();
-        let header_h = 74.0;
-        let left_panel_w = 230.0;
-        let right_panel_w = 280.0;
-        let center_w = screen_w - left_panel_w - right_panel_w - 70.0;
+        let header_h = 112.0;
+        let left_panel_w = 218.0;
 
         self.update_tutorial_progress(
             tutorial,
@@ -138,15 +142,68 @@ impl SectBaseState {
             None
         };
 
-        let center_rect = match self.view {
-            SectView::Map => Rect::new(0.0, header_h, screen_w, screen_h - header_h),
-            _ => Rect::new(
-                left_panel_w + 34.0,
-                header_h + 16.0,
-                center_w,
-                screen_h - header_h - 32.0,
-            ),
+        // Focused screens own input for the entire frame, including the close frame.
+        if self.settings_open {
+            return self
+                .draw_settings_modal(screen_w, screen_h)
+                .unwrap_or_else(UpdateResult::new);
+        }
+        if self.annals_open {
+            self.draw_annals(event_log);
+            return UpdateResult::new();
+        }
+        if self.tech_tree_open {
+            let action = tech::draw_tech_tree_modal(
+                &mut self.tech_tree_state,
+                data,
+                unlocked_techs,
+                spirit_stones,
+            );
+            if self.tech_tree_state.closed {
+                self.tech_tree_open = false;
+            }
+            return action
+                .map(|action| UpdateResult::new().with_action(action))
+                .unwrap_or_else(UpdateResult::new);
+        }
+        if self.crafting_modal_open {
+            let result = match self.view {
+                SectView::Map => self.draw_construction_modal(data, unlocked_techs, spirit_stones),
+                SectView::BuildingDetails(id) => {
+                    if let Some(building) = data.buildings.iter().find(|b| b.id == id) {
+                        self.draw_crafting_modal(
+                            data,
+                            &building.building_type,
+                            spirit_stones,
+                            herbs,
+                            inventory,
+                            disciples,
+                            discovered_recipes,
+                        )
+                    } else {
+                        self.crafting_modal_open = false;
+                        None
+                    }
+                }
+                SectView::SpiritBeasts => {
+                    self.crafting_modal_open = false;
+                    None
+                }
+            };
+            return result.unwrap_or_else(UpdateResult::new);
+        }
+        let guidance_h = if tutorial.active && !tutorial.hidden {
+            112.0
+        } else {
+            0.0
         };
+        let content_top = header_h + guidance_h;
+        let center_rect = Rect::new(
+            left_panel_w + 32.0,
+            content_top + 12.0,
+            screen_w - left_panel_w - 48.0,
+            screen_h - content_top - 24.0,
+        );
         if let Some(res) = self.draw_center_panel(
             center_rect,
             data,
@@ -180,18 +237,9 @@ impl SectBaseState {
             tutorial,
         );
 
-        if let Some(res) = self.draw_left_panel(header_h, screen_h, left_panel_w, data) {
+        if let Some(res) = self.draw_left_panel(content_top, screen_h, left_panel_w, data) {
             return res;
         }
-
-        self.draw_right_panel(
-            header_h,
-            screen_h,
-            left_panel_w,
-            center_w,
-            right_panel_w,
-            event_log,
-        );
 
         self.draw_tutorial_highlights();
         if tutorial.active && !tutorial.hidden {
@@ -207,6 +255,16 @@ impl SectBaseState {
         UpdateResult::new()
     }
 
+    /// Configure real UI states for the shared screenshot harness.
+    pub fn prepare_capture(&mut self, scene: &str, hall_id: u64) {
+        if scene == "hall" || scene == "doctrine" {
+            self.view = SectView::BuildingDetails(hall_id);
+        }
+        self.tech_tree_open = scene == "doctrine";
+        self.annals_open = scene == "annals";
+        self.crafting_modal_open = scene == "construction";
+    }
+
     pub fn draw(&self, _data: &GameData, _grid: &Grid, _spirit_stones: u32) {
         // Drawing handled in update for immediate mode
     }
@@ -218,6 +276,8 @@ impl SectBaseState {
 
         if self.settings_open {
             self.settings_open = false;
+        } else if self.annals_open {
+            self.annals_open = false;
         } else if self.tech_tree_open {
             self.tech_tree_open = false;
         } else if self.crafting_modal_open {
@@ -253,9 +313,7 @@ impl SectBaseState {
         discovered_recipes: &[String],
     ) -> Option<UpdateResult> {
         match self.view {
-            SectView::Map => {
-                self.draw_map_view(rect, data, grid, textures, spirit_stones, unlocked_techs)
-            }
+            SectView::Map => self.draw_map_view(rect, data, textures),
             SectView::BuildingDetails(id) => self.draw_building_details(
                 rect,
                 id,

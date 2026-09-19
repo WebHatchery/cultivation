@@ -169,7 +169,7 @@ impl Game {
                     "Fallen Peak Sect".to_string(),
                 ));
             }
-            "sectbase" => {
+            "sectbase" | "hall" | "doctrine" | "annals" | "construction" => {
                 // Seed a real fresh campaign so the scene matches actual play
                 // (ruined Sect Hall, tutorial step 0, starting resources).
                 self.execute_action(crate::engine::actions::Action::StartNewGame(
@@ -177,6 +177,22 @@ impl Game {
                 ));
                 self.transition(crate::state::StateTransition::ToSectBase);
                 self.active_moment = None;
+                if scene == "construction" {
+                    self.unlocked_techs.push("sect_administration".to_owned());
+                }
+                if scene != "sectbase" {
+                    if let Some(hall) = self
+                        .data
+                        .buildings
+                        .iter_mut()
+                        .find(|b| b.building_type == BuildingType::SectHall)
+                    {
+                        hall.status = BuildingStatus::Active;
+                        if let GameState::SectBase(state) = &mut self.state {
+                            state.prepare_capture(scene, hall.id);
+                        }
+                    }
+                }
             }
             "worldmap" => self.state = GameState::WorldMap(WorldMapState::new()),
             _ => {
