@@ -7,6 +7,15 @@ use crate::state::{
 };
 impl Game {
     pub(super) fn prepare_management_capture(&mut self, scene: &str) -> bool {
+        if scene == "creation" {
+            self.active_moment = None;
+            self.transition(crate::state::StateTransition::ToSectCreation);
+            return true;
+        }
+        if scene == "moment" {
+            self.show_moment(super::moments::MomentKind::Founding, "The Sect Hall stands again", "A foundation for Fallen Peak", "The disciples have restored their gathering place. Recover the first doctrine to open dispatches and begin rebuilding the mountain.");
+            return true;
+        }
         if self.prepare_facility_scene(scene) {
             return true;
         }

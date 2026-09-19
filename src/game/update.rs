@@ -25,6 +25,10 @@ impl Game {
         }
 
         self.draw_screen_background();
+        if self.active_moment.is_some() {
+            self.update_moment_timer();
+            return;
+        }
         self.tick += 1;
 
         let disciples_on_mission = self.collect_disciples_on_mission();
@@ -402,6 +406,10 @@ impl Game {
     }
 
     pub fn draw(&mut self) {
+        if self.active_moment.is_some() {
+            self.draw_active_moment();
+            return;
+        }
         match &mut self.state {
             GameState::MainMenu(s) => s.draw(&self.data, self.spirit_stones),
             GameState::Intro(s) => s.draw(),
@@ -424,8 +432,6 @@ impl Game {
         if self.show_ai_debug {
             self.draw_ai_debug();
         }
-
-        self.draw_active_moment();
     }
 
     fn draw_ai_debug(&self) {

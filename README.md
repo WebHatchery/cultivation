@@ -31,11 +31,13 @@ Playable sect-management foundation with base building, disciple growth, world m
 
 ## Documentation
 
-- `gdd.md` — the game design document.
-- `TODO.md` — open work.
-- `wuxia-buildings.md` — the building-type reference `generate_prompts.py` reads to build art prompts.
+- `gdd.md` â€” the game design document.
+- `TODO.md` â€” open work.
+- `wuxia-buildings.md` â€” the building-type reference `generate_prompts.py` reads to build art prompts.
 
 
 ## UX verification
 
-The sect and doctrine layouts were visually checked at 1280�720 and 800�600 with the toolkit capture harness. Capture scenes `sectbase`, `hall`, `doctrine`, `annals`, and `construction` exercise the real UI; images live directly in `docs/verification/`. Doctrine recovery, history, settings, and construction own input while open. Building and construction lists use whole-item pages, and the map is clipped with the shared toolkit viewport.
+The gameplay workspaces use focused lists, selected records, and explicit actions. Roster progress, lineage, and orders have separate views; dispatches move through briefing, team, and review. Facilities separate production, attendants, arrays, and upgrades. Regional maps, markets, factions, archives, reports, and guardian records page through complete content with visible touch controls. Story pages have Previous, Continue, and Skip controls; milestones pause gameplay until acknowledged.
+
+Native UI captures at 800x600 and 1280x720 live in `docs/verification/`. The toolkit capture harness seeds real UI states for repeatable checks, including empty states and disabled actions. Capture scenes include `sectbase`, `hall`, `doctrine`, `annals`, `construction`, `roster`, `roster_orders`, `dispatch`, `dispatch_team`, `dispatch_review`, `report`, `tribulation`, `garden`, `seeds`, `attendants`, `array`, `storage`, `drying`, `workshop`, `guardians`, `mission_board`, `trade`, `factions`, `library`, `worldmap`, `creation`, `intro`, and `moment`.

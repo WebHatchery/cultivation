@@ -134,7 +134,12 @@ pub fn text_pages(rect: Rect, paragraphs: &[String], current: &mut usize) {
             lines
         })
         .collect();
-    let range = page(rect, lines.len(), 26.0, current);
+    let range = if lines.len() as f32 * 26.0 <= rect.h {
+        *current = 0;
+        0..lines.len()
+    } else {
+        page(rect, lines.len(), 26.0, current)
+    };
     for (row, index) in range.enumerate() {
         draw_ui_text(
             &lines[index],
