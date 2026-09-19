@@ -21,6 +21,10 @@ pub fn button(rect: Rect, label: &str, primary: bool, enabled: bool) -> bool {
 }
 
 pub fn header(title: &str, purpose: &str) -> bool {
+    header_to(title, purpose, "Back to Sect")
+}
+
+pub fn header_to(title: &str, purpose: &str, back: &str) -> bool {
     draw_rectangle(
         0.0,
         0.0,
@@ -38,9 +42,12 @@ pub fn header(title: &str, purpose: &str) -> bool {
         FONT_SMALL_SIZE,
         TEXT_SECONDARY,
     );
+    if back.is_empty() {
+        return false;
+    }
     button(
         Rect::new(screen_width() - 142.0, 24.0, 118.0, 48.0),
-        "Back to Sect",
+        back,
         false,
         true,
     ) || is_key_pressed(KeyCode::Escape)

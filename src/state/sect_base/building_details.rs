@@ -209,17 +209,6 @@ impl SectBaseState {
             return self.draw_ruined_building(rect, building, b_type, action_y);
         }
 
-        if *b_type == BuildingType::MissionBoard {
-            return self.draw_mission_list(
-                rect,
-                data,
-                ongoing_missions,
-                completed_missions,
-                completed_history,
-                action_y,
-            );
-        }
-
         if matches!(b_type, BuildingType::HerbGarden | BuildingType::Greenhouse) {
             return self.draw_herb_building_details(
                 rect,

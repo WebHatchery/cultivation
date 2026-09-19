@@ -55,8 +55,8 @@ pub struct SectBaseState {
     pub(super) building_mask_cache: HashMap<String, Image>,
     pub(super) selected_beast_index: Option<usize>,
     pub(super) beast_equip_modal_open: bool,
-    pub(super) selected_mission: Option<String>,
-    pub(super) mission_scroll: f32,
+    pub(super) mission_tab: usize,
+    pub(super) mission_page: usize,
     pub(super) herb_planting_modal: Option<usize>,
     pub(super) disciple_assignment_modal: bool,
     pub(super) infusion_modal_open: bool,
@@ -85,8 +85,8 @@ impl SectBaseState {
             building_mask_cache: HashMap::new(),
             selected_beast_index: None,
             beast_equip_modal_open: false,
-            selected_mission: None,
-            mission_scroll: 0.0,
+            mission_tab: 0,
+            mission_page: 0,
             herb_planting_modal: None,
             disciple_assignment_modal: false,
             infusion_modal_open: false,
@@ -199,6 +199,22 @@ impl SectBaseState {
                 }
             };
             return result.unwrap_or_else(UpdateResult::new);
+        }
+        if let SectView::BuildingDetails(id) = self.view {
+            if data.buildings.iter().any(|building| {
+                building.id == id
+                    && building.building_type == BuildingType::MissionBoard
+                    && building.status == BuildingStatus::Active
+            }) {
+                return self
+                    .draw_mission_board(
+                        data,
+                        ongoing_missions,
+                        completed_missions,
+                        completed_history,
+                    )
+                    .unwrap_or_else(UpdateResult::new);
+            }
         }
         let guidance_h = if tutorial.active && !tutorial.hidden {
             112.0

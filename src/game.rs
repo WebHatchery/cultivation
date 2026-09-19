@@ -16,6 +16,7 @@ use crate::ui::{FontManager, TextureManager};
 
 mod actions;
 mod breakthrough;
+mod capture_scenes;
 mod herbs;
 mod items;
 mod missions;
@@ -163,6 +164,9 @@ impl Game {
 
     /// Seed a specific scene for the screenshot harness.
     pub fn begin_capture_scene(&mut self, scene: &str) {
+        if self.prepare_management_capture(scene) {
+            return;
+        }
         match scene {
             "intro" => {
                 self.execute_action(crate::engine::actions::Action::StartNewGame(
