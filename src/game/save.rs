@@ -62,6 +62,7 @@ impl Game {
 
                 let textures = std::mem::take(&mut self.textures);
                 let fonts = std::mem::take(&mut self.fonts);
+                let display_settings = std::mem::take(&mut self.display_settings);
 
                 let mut new_game = Self {
                     state: crate::state::GameState::SectBase(
@@ -94,6 +95,8 @@ impl Game {
                     textures,
                     fonts,
                     active_moment: None,
+                    display_settings,
+                    display_notice: None,
                 };
 
                 // Restore building states

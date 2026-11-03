@@ -149,4 +149,4 @@ The former Touch controls and presentation tasks are merged into UI-01–12 and 
 
 ## Settings and display
 
-- [ ] Add a Fullscreen toggle to the existing Settings modal and persist/apply the player's display preference.
+- [x] Add a Fullscreen toggle to the existing Settings modal and persist/apply the player's display preference.

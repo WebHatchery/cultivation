@@ -271,11 +271,12 @@ impl SectBaseState {
         &mut self,
         screen_w: f32,
         screen_h: f32,
+        fullscreen: bool,
     ) -> Option<UpdateResult> {
         draw_rectangle(0.0, 0.0, screen_w, screen_h, Color::new(0.0, 0.0, 0.0, 0.8));
 
-        let modal_w = 300.0;
-        let modal_h = 250.0;
+        let modal_w = 360.0;
+        let modal_h = 310.0;
         let modal_x = (screen_w - modal_w) / 2.0;
         let modal_y = (screen_h - modal_h) / 2.0;
         let modal_rect = Rect::new(modal_x, modal_y, modal_w, modal_h);
@@ -283,7 +284,19 @@ impl SectBaseState {
         draw_panel(modal_rect, Some("Patriarch's Seal"));
 
         if draw_button(
-            Rect::new(modal_x + 50.0, modal_y + 60.0, 200.0, 40.0),
+            Rect::new(modal_x + 80.0, modal_y + 56.0, 200.0, 40.0),
+            if fullscreen {
+                "Fullscreen: ON"
+            } else {
+                "Fullscreen: OFF"
+            },
+            fullscreen,
+        ) {
+            return Some(UpdateResult::new().with_action(Action::ToggleFullscreen));
+        }
+
+        if draw_button(
+            Rect::new(modal_x + 80.0, modal_y + 108.0, 200.0, 40.0),
             "Inscribe Chronicle",
             false,
         ) {
@@ -291,7 +304,7 @@ impl SectBaseState {
         }
 
         if draw_button(
-            Rect::new(modal_x + 50.0, modal_y + 120.0, 200.0, 40.0),
+            Rect::new(modal_x + 80.0, modal_y + 160.0, 200.0, 40.0),
             "Return to Title",
             false,
         ) {
@@ -299,7 +312,7 @@ impl SectBaseState {
         }
 
         if draw_button(
-            Rect::new(modal_x + 50.0, modal_y + 180.0, 200.0, 40.0),
+            Rect::new(modal_x + 80.0, modal_y + 212.0, 200.0, 40.0),
             "Close Seal",
             false,
         ) {

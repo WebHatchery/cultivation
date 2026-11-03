@@ -1,3 +1,4 @@
+use super::display::{self, DisplayPreviewAction};
 use super::Game;
 use crate::data::buildings::{BuildingStatus, BuildingType};
 use crate::data::disciples::DiscipleRank;
@@ -12,7 +13,8 @@ use crate::state::{
 use crate::ui::components::{draw_panel, draw_progress_bar};
 use crate::ui::theme::*;
 use macroquad::prelude::{
-    draw_rectangle, is_key_pressed, screen_height, screen_width, Color, KeyCode, Rect,
+    draw_rectangle, get_frame_time, is_key_pressed, screen_height, screen_width, Color, KeyCode,
+    Rect,
 };
 use macroquad_toolkit::rng as game_rng;
 use macroquad_toolkit::ui::draw_ui_text;
@@ -20,6 +22,52 @@ use std::collections::HashSet;
 
 impl Game {
     pub fn update(&mut self) {
+        let frame_time = get_frame_time();
+        if let Some((_, seconds)) = &mut self.display_notice {
+            *seconds -= frame_time.max(0.0);
+            if *seconds <= 0.0 {
+                self.display_notice = None;
+            }
+        }
+
+        let preview_expired = self.display_settings.update(frame_time);
+        if self.display_settings.is_previewing() {
+            self.draw_screen_background();
+            if let Some(action) = display::draw_preview(
+                self.display_settings
+                    .preview_remaining()
+                    .unwrap_or_default(),
+            ) {
+                match action {
+                    DisplayPreviewAction::Keep => match self.display_settings.keep_preview() {
+                        Ok(()) => {
+                            self.display_notice =
+                                Some(("Fullscreen preference saved.".to_owned(), 3.0));
+                        }
+                        Err(error) => {
+                            eprintln!("Could not save fullscreen preference: {error}");
+                            self.display_notice = Some((
+                                "Could not save. Previous display setting restored.".to_owned(),
+                                4.0,
+                            ));
+                        }
+                    },
+                    DisplayPreviewAction::Revert => {
+                        self.display_settings.revert_preview();
+                        self.display_notice =
+                            Some(("Previous display setting restored.".to_owned(), 3.0));
+                    }
+                }
+            }
+            return;
+        }
+        if preview_expired {
+            self.display_notice = Some((
+                "Display preview expired; previous setting restored.".to_owned(),
+                4.0,
+            ));
+        }
+
         if is_key_pressed(KeyCode::F9) {
             self.show_ai_debug = !self.show_ai_debug;
         }
@@ -323,6 +371,7 @@ impl Game {
     }
 
     fn dispatch_state_update(&mut self) {
+        let fullscreen = self.display_settings.fullscreen();
         let update_result = match &mut self.state {
             GameState::MainMenu(s) => s.update(),
             GameState::Intro(s) => s.update(&self.sect_name),
@@ -347,6 +396,7 @@ impl Game {
                 self.season_ticks,
                 &mut self.tutorial,
                 &self.discovered_recipes,
+                fullscreen,
             ),
             GameState::DiscipleRoster(s) => s.update(&self.data, &self.disciples, &self.inventory),
             GameState::WorldMap(s) => s.update(&self.data),
@@ -408,6 +458,7 @@ impl Game {
     pub fn draw(&mut self) {
         if self.active_moment.is_some() {
             self.draw_active_moment();
+            self.draw_display_notice();
             return;
         }
         match &mut self.state {
@@ -431,6 +482,13 @@ impl Game {
 
         if self.show_ai_debug {
             self.draw_ai_debug();
+        }
+        self.draw_display_notice();
+    }
+
+    fn draw_display_notice(&self) {
+        if let Some((message, _)) = &self.display_notice {
+            display::draw_notice(message);
         }
     }
 

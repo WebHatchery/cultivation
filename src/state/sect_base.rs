@@ -131,6 +131,7 @@ impl SectBaseState {
         season_ticks: u32,
         tutorial: &mut TutorialState,
         discovered_recipes: &[String],
+        fullscreen: bool,
     ) -> UpdateResult {
         if let Some(res) = self.handle_global_input() {
             return res;
@@ -169,7 +170,7 @@ impl SectBaseState {
         // Focused screens own input for the entire frame, including the close frame.
         if self.settings_open {
             return self
-                .draw_settings_modal(screen_w, screen_h)
+                .draw_settings_modal(screen_w, screen_h, fullscreen)
                 .unwrap_or_else(UpdateResult::new);
         }
         if self.annals_open {
@@ -326,7 +327,7 @@ impl SectBaseState {
         }
 
         if self.settings_open {
-            if let Some(res) = self.draw_settings_modal(screen_w, screen_h) {
+            if let Some(res) = self.draw_settings_modal(screen_w, screen_h, fullscreen) {
                 return res;
             }
         }
@@ -336,6 +337,7 @@ impl SectBaseState {
 
     /// Configure real UI states for the shared screenshot harness.
     pub fn prepare_capture(&mut self, scene: &str, hall_id: u64) {
+        self.settings_open = scene == "settings";
         if scene == "hall" || scene == "doctrine" {
             self.view = SectView::BuildingDetails(hall_id);
         }

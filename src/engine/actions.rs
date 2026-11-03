@@ -19,6 +19,7 @@ pub enum Action {
     ConstructBuilding(BuildingType, i32, i32), // Type, X, Y
     SaveGame,
     LoadGame,
+    ToggleFullscreen,
     StartNewGame(String), // Sect Name
     // Herb system actions
     PlantHerb(u64, usize, String), // Building ID, Plot Index, Herb ID

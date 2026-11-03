@@ -29,6 +29,7 @@ impl Game {
             Action::ClaimRewards(outcome) => self.handle_claim_rewards(outcome),
             Action::SaveGame => self.handle_save_game(),
             Action::LoadGame => self.handle_load_game(),
+            Action::ToggleFullscreen => self.display_settings.begin_preview(),
             Action::AssignLaw(disciple_idx, law_id) => self.handle_assign_law(disciple_idx, law_id),
             Action::CraftItem(recipe_id) => self.handle_craft_item(recipe_id),
             Action::UseItem(item_id, disciple_idx) => self.handle_use_item(item_id, disciple_idx),

@@ -17,6 +17,7 @@ use crate::ui::{FontManager, TextureManager};
 mod actions;
 mod breakthrough;
 mod capture_scenes;
+mod display;
 mod herbs;
 mod items;
 mod missions;
@@ -25,6 +26,7 @@ mod save;
 mod update;
 mod world;
 
+use self::display::DisplaySettings;
 use self::moments::MomentOverlay;
 
 const FOUNDATION_TRIAL_MISSION: &str = "Foundation Trial (Solo)";
@@ -75,10 +77,14 @@ pub struct Game {
     pub fonts: FontManager,
     /// Short-lived dramatic presentation for major sect moments
     pub(in crate::game) active_moment: Option<MomentOverlay>,
+    display_settings: DisplaySettings,
+    display_notice: Option<(String, f32)>,
 }
 
 impl Game {
     pub async fn new() -> Self {
+        let display_settings =
+            DisplaySettings::load(macroquad_toolkit::capture::capture_requested("CULTIVATION"));
         let mut data = GameData::load_async()
             .await
             .expect("Failed to load game data");
@@ -159,6 +165,8 @@ impl Game {
             textures,
             fonts,
             active_moment: None,
+            display_settings,
+            display_notice: None,
         }
     }
 
@@ -173,7 +181,7 @@ impl Game {
                     "Fallen Peak Sect".to_string(),
                 ));
             }
-            "sectbase" | "hall" | "doctrine" | "annals" | "construction" => {
+            "sectbase" | "hall" | "doctrine" | "annals" | "construction" | "settings" => {
                 // Seed a real fresh campaign so the scene matches actual play
                 // (ruined Sect Hall, tutorial step 0, starting resources).
                 self.execute_action(crate::engine::actions::Action::StartNewGame(
