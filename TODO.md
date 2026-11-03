@@ -146,3 +146,7 @@ The former Touch controls and presentation tasks are merged into UI-01–12 and 
 - [ ] **Add timestamped saves and bounded offline progress.** Extend persistence/progression with elapsed-time caps and a dismissible “while you were away” summary. Accept when caps hold and gains remain visible in state/history; verify reload, no elapsed time, capped absence and touch dismissal.
 - [ ] **Implement prestige/New Game+.** Define reset/carryover rules in gdd.md, persistence and new-campaign handlers before adding entry UI. Accept when a review states losses/gains and cancellation preserves the save; verify carryover/reset/reload and touch confirmation/recovery.
 - [ ] **Add music and effects with accessible volume controls.** Integrate audio through supported toolkit/engine facilities; keep volume/mute in Settings. Accept when preferences persist and gameplay is understandable without sound; verify browser audio activation, mute/unmute, reload and visible touch controls.
+
+## Settings and display
+
+- [ ] Add a Fullscreen toggle to the existing Settings modal and persist/apply the player's display preference.
